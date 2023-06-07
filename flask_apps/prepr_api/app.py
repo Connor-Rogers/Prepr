@@ -12,6 +12,8 @@ def app_factory():
     app.config = {
         "DEBUG": True
     }
+    from bp.main_bp import main
+    app.register_blueprint(main)
 
     return app
 
