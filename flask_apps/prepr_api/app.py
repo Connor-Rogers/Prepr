@@ -2,6 +2,8 @@
 import flask
 from flask import Blueprint
 from flask_cors import CORS
+from firebase_admin import credentials
+import firebase_admin
 
 
 def app_factory():
@@ -25,11 +27,21 @@ def app_factory():
         "SESSION_REFRESH_EACH_REQUEST": True,
         "SESSION_COOKIE_HTTPONLY": True,
         "TRAP_HTTP_EXCEPTIONS": True,
+        "MAX_CONTENT_LENGTH": 16 * 1024 * 1024,
     }
-    CORS(app, origins=["http://localhost:8100"])
+    CORS(
+        app,
+        resources={r"/profile/*": {"origins": "http://localhost:3000"}},
+        supports_credentials=True,
+    )
     from bp.main_bp import main
 
     app.register_blueprint(main)
+    # try:
+    #     cred = credentials.Certificate("prepr_fb_secret.json")
+    #     firebase_admin.initialize_app(cred)
+    # except ValueError:
+    #     pass
 
     return app
 
