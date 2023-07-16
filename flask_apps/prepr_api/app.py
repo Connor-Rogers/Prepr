@@ -2,8 +2,6 @@
 import flask
 from flask import Blueprint
 from flask_cors import CORS
-from firebase_admin import credentials
-import firebase_admin
 
 
 def app_factory():
@@ -13,6 +11,7 @@ def app_factory():
 
     app = flask.Flask(__name__)
     app.config = {
+        "ENV": "development",
         "SECRET_KEY": "secret",
         "DEBUG": True,
         "SERVER_NAME": "127.0.0.1:5000",
@@ -28,6 +27,11 @@ def app_factory():
         "SESSION_COOKIE_HTTPONLY": True,
         "TRAP_HTTP_EXCEPTIONS": True,
         "MAX_CONTENT_LENGTH": 16 * 1024 * 1024,
+        "JSON_AS_ASCII": False,
+        "PRESERVE_CONTEXT_ON_EXCEPTION": True,
+        "JSON_SORT_KEYS": False,
+        "JSONIFY_PRETTYPRINT_REGULAR": True,
+        "JSONIFY_MIMETYPE": "application/json",
     }
     CORS(
         app,
