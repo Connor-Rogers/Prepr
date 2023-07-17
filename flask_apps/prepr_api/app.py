@@ -35,7 +35,7 @@ def app_factory():
     }
     CORS(
         app,
-        resources={r"/profile/*": {"origins": "http://localhost:3000"}},
+        resources={r"/*": {"origins": "*"}},
         supports_credentials=True,
     )
     from bp.main_bp import main
@@ -49,7 +49,7 @@ def app_factory():
 
     return app
 
-
+ 
 if __name__ == "__main__":
     app = app_factory()
     app.run()
