@@ -39,8 +39,13 @@ def app_factory():
         supports_credentials=True,
     )
     from bp.main_bp import main
+    from bp.profile_bp import profile
+    from bp.recipe_bp import recipe
 
     app.register_blueprint(main)
+    app.register_blueprint(profile)
+    app.register_blueprint(recipe)
+
     # try:
     #     cred = credentials.Certificate("prepr_fb_secret.json")
     #     firebase_admin.initialize_app(cred)
@@ -49,7 +54,7 @@ def app_factory():
 
     return app
 
- 
+
 if __name__ == "__main__":
     app = app_factory()
     app.run()
