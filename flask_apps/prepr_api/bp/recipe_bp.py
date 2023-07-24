@@ -1,9 +1,10 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from lib.iam import firebase_auth_required
 from lib.firebase import buckit, db
 from PIL import Image
+from datetime import timedelta
 import io, re
-import openai
+import datetime
 import uuid
 
 
@@ -70,6 +71,8 @@ def create_recipe():
 
     doc_ref.set(
         {
+            "author": g.user.get("user_id"),
+            "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "title": title,
             "instructions": instructions,
             "calories": calories,
@@ -82,3 +85,122 @@ def create_recipe():
     )
 
     return jsonify({"message": "Recipe created successfully"}), 200
+
+
+@recipe.route("/recipe/<string:document_id>/photos", methods=["GET"])
+@firebase_auth_required
+def get_recipe_photos(document_id):
+    doc_ref = db.collection("recipes").document(document_id)
+    try:
+        doc = doc_ref.get()
+        if doc.exists:
+            profile_data = doc.to_dict()
+
+            # Fetch the image url from Firebase storage
+            bucket = buckit.get_bucket("prepr-391015.appspot.com")
+
+            # Get a list of all blobs in the 'recipes/{document_id}' directory
+            blobs = bucket.list_blobs(prefix=f"recipes/{document_id}")
+
+            # Generate signed url for each blob and add to image_urls list
+            image_urls = []
+            for blob in blobs:
+                image_url = blob.generate_signed_url(
+                    timedelta(seconds=300), method="GET"
+                )
+                image_urls.append(image_url)
+
+            profile_data["photos"] = image_urls
+
+            return jsonify(profile_data), 200
+        else:
+            return jsonify({"error": "Recipe not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@recipe.route("/recipe/<string:document_id>", methods=["GET"])
+def get_recipe(document_id):
+    try:
+        doc_ref = db.collection("recipes").document(document_id)
+        doc = doc_ref.get()
+        if doc.exists:
+            recipe_data = doc.to_dict()
+            return jsonify(recipe_data), 200
+        else:
+            return jsonify({"message": "Recipe not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@recipe.route("/recipe/<recipe_id>", methods=["PUT"])
+@firebase_auth_required
+def update_recipe(recipe_id):
+    data = request.form
+    dict_data = {}
+    for key, value in data.lists():
+        if "ingredients" in key:
+            index = int(key.split("[")[1].split("]")[0])
+            sub_key = key.split("[")[2].split("]")[0]
+            if "ingredients" not in dict_data:
+                dict_data["ingredients"] = []
+            if len(dict_data["ingredients"]) - 1 < index:
+                dict_data["ingredients"].append({})
+            dict_data["ingredients"][index][sub_key] = value[0]
+        elif "photos" not in key:
+            dict_data[key] = value[0]
+
+    # process form data and validate it here
+
+    # retrieve the recipe document
+    doc_ref = db.collection("recipes").document(recipe_id)
+
+    # update the recipe document
+    doc_ref.update(dict_data)
+
+    return jsonify({"message": "Recipe updated successfully"}), 200
+
+
+@recipe.route("/recipe/<recipe_id>/photos", methods=["POST"])
+@firebase_auth_required
+def add_photos(recipe_id):
+    photos = request.files.getlist("photos")
+    bucket = buckit.get_bucket("prepr-391015.appspot.com")
+    photo_urls = []
+    for i, photo in enumerate(photos):
+        photo_bytes = io.BytesIO()
+        photo.save(photo_bytes)
+        photo_bytes.seek(0)
+        blob_name = f"recipes/{recipe_id}/photo_{i}.jpg"
+        blob = bucket.blob(blob_name)
+        blob.upload_from_file(photo_bytes, content_type=photo.content_type)
+        photo_urls.append(blob.public_url)
+
+    doc_ref = db.collection("recipes").document(recipe_id)
+    doc_ref.update({"photos": db.firestore.ArrayUnion(photo_urls)})
+    return jsonify({"message": "Photos added successfully", "photos": photo_urls}), 200
+
+
+@recipe.route("/recipe/<recipe_id>/photos", methods=["DELETE"])
+@firebase_auth_required
+def delete_photos(recipe_id):
+    photos_to_remove = request.form.getlist("photos")
+    bucket = buckit.get_bucket("prepr-391015.appspot.com")
+
+    for photo_url in photos_to_remove:
+        photo_name = re.findall(r"([^/]+)/?$", photo_url)[0]
+        blob = bucket.blob(f"recipes/{recipe_id}/{photo_name}")
+        blob.delete()
+
+    doc_ref = db.collection("recipes").document(recipe_id)
+    doc = doc_ref.get()
+    if doc.exists:
+        doc_data = doc.to_dict()
+        doc_data["photos"] = [
+            photo for photo in doc_data["photos"] if photo not in photos_to_remove
+        ]
+        doc_ref.set(doc_data)
+    else:
+        print("No such document!")
+
+    return jsonify({"message": "Photos removed successfully"}), 200

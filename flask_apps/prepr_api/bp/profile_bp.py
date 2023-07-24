@@ -167,3 +167,52 @@ def get_icon():
             return jsonify({"error": "Profile not found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+
+@profile.route("/profile/get/username", methods=["GET"])
+@firebase_auth_required
+def get_username():
+    user_id = g.user.get("user_id")
+    doc_ref = db.collection("profile").document(user_id)
+
+    try:
+        doc = doc_ref.get()
+        if doc.exists:
+            profile_data = doc.to_dict()
+            username = profile_data.get("name", "")
+            return jsonify({"username": username}), 200
+        else:
+            return jsonify({"error": "Profile not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@profile.route("/profile/get/photo/<other_user_id>", methods=["GET"])
+@firebase_auth_required
+def get_other_icon(other_user_id):
+    doc_ref = db.collection("profile").document(other_user_id)
+
+    try:
+        doc = doc_ref.get()
+        if doc.exists:
+            profile_data = doc.to_dict()
+
+            # Fetch the image url from Firebase storage
+            bucket = buckit.get_bucket("prepr-391015.appspot.com")
+
+            # Get a list of all blobs in the 'profile/{other_user_id}' directory
+            blobs = bucket.list_blobs(prefix=f"profile/{other_user_id}")
+
+            # Ensure there is at least one blob in the directory
+            blob = next(blobs, None)
+            if blob:
+                image_url = blob.generate_signed_url(
+                    timedelta(seconds=300), method="GET"
+                )
+                profile_data["image_url"] = image_url
+
+            return jsonify(profile_data), 200
+        else:
+            return jsonify({"error": "Profile not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

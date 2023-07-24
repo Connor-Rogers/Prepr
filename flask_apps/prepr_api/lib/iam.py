@@ -11,10 +11,8 @@ def firebase_auth_required(f):
             return jsonify({"message": "Token is missing"}), 403
 
         try:
-            print("here")
             id_token = id_token.split("Bearer ")[1]
             decoded_token = auth.verify_id_token(id_token)
-            print(decoded_token)
             g.user = decoded_token
         except ValueError as e:
             return jsonify({"message": "Invalid token", "error": str(e)}), 401
