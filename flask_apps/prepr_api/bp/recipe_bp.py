@@ -119,8 +119,20 @@ def get_recipe_photos(document_id):
         return jsonify({"error": str(e)}), 400
 
 
-@recipe.route("/recipe/<string:document_id>", methods=["GET"])
-def get_recipe(document_id):
+@recipe.route("/recipe/<string:document_id>", methods=["GET", "DELETE"])
+def handle_recipe(document_id):
+    if request.method == "DELETE":
+        try:
+            doc_ref = db.collection("recipes").document(document_id)
+            doc_ref.delete()
+            bucket = buckit.get_bucket("prepr-391015.appspot.com")
+            blobs = bucket.list_blobs(prefix=f"recipes/{document_id}")
+            bucket.delete_blobs(blobs)
+            return jsonify({"message": "Recipe deleted successfully"}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # For GET request
     try:
         doc_ref = db.collection("recipes").document(document_id)
         doc = doc_ref.get()
@@ -204,3 +216,51 @@ def delete_photos(recipe_id):
         print("No such document!")
 
     return jsonify({"message": "Photos removed successfully"}), 200
+
+
+@recipe.route("/recipe/<string:document_id>/like", methods=["GET", "POST"])
+@firebase_auth_required
+def handle_like_recipe(document_id):
+    try:
+        if request.method == "GET":
+            doc_ref = db.collection("likes").document(document_id)
+            doc = doc_ref.get()
+            if doc.exists:
+                recipe_data = doc.to_dict()
+                likes = recipe_data.get("likes", [])
+                return jsonify({"likes": likes}), 200
+            else:
+                return jsonify({"message": "Recipe not found"}), 404
+
+        if request.method == "POST":
+            user_id = g.user.get("user_id")
+            like_status = request.json.get("like")
+            if like_status is None:
+                return jsonify({"error": "Invalid request"}), 400
+
+            doc_ref = db.collection("likes").document(document_id)
+            doc = doc_ref.get()
+            if doc.exists:
+                recipe_data = doc.to_dict()
+                likes = recipe_data.get("likes", [])
+                if like_status:
+                    if user_id not in likes:
+                        likes.append(user_id)
+                else:
+                    if user_id in likes:
+                        likes.remove(user_id)
+
+                # Update the 'likes' field in the recipe document
+                doc_ref.update({"likes": likes})
+
+                return jsonify({"message": "Like status updated successfully"}), 200
+            else:
+                # If the document doesn't exist, create a new "like" document
+                doc_ref.set({"likes": [user_id] if like_status else []})
+                return jsonify({"message": "Like status updated successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# except Exception as e:
+# return jsonify({"error": str(e)}), 500

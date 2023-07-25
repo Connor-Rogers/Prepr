@@ -74,8 +74,8 @@ def update_goals():
 @firebase_auth_required
 def create_or_update_profile():
     name = request.form.get("name")  # getting name from form data
-    image = request.files["image"]  # getting image from form data
-    file_ext = image.filename.split(".")[-1]
+    image = request.files.get("image", None)  # getting image from form data
+
     user_id = g.user.get("user_id")  # getting user_id
 
     # Name validation
@@ -84,6 +84,7 @@ def create_or_update_profile():
 
     # Check the file type
     if image:
+        file_ext = image.filename.split(".")[-1]
         try:
             Image.open(image)
             image.seek(0)
