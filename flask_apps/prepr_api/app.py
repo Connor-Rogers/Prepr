@@ -41,7 +41,9 @@ def app_factory():
     from bp.main_bp import main
     from bp.profile_bp import profile
     from bp.recipe_bp import recipe
+    from bp.planner_bp import meal_plan
 
+    app.register_blueprint(meal_plan)
     app.register_blueprint(main)
     app.register_blueprint(profile)
     app.register_blueprint(recipe)

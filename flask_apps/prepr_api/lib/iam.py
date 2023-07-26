@@ -12,6 +12,7 @@ def firebase_auth_required(f):
 
         try:
             id_token = id_token.split("Bearer ")[1]
+
             decoded_token = auth.verify_id_token(id_token)
             g.user = decoded_token
         except ValueError as e:
