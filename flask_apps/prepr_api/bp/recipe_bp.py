@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, make_response, request, jsonify, g
 from lib.iam import firebase_auth_required
 from lib.firebase import buckit, db
 from PIL import Image
@@ -35,7 +35,6 @@ def create_recipe():
         # extend the list of ingredients if necessary
         while index >= len(ingredients):
             ingredients.append({})
-
         # add the property to the appropriate ingredient
         ingredients[index][prop] = form_data[k]
 
@@ -117,60 +116,6 @@ def get_recipe_photos(document_id):
             return jsonify({"error": "Recipe not found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 400
-
-
-@recipe.route("/recipe/<string:document_id>", methods=["GET", "DELETE"])
-def handle_recipe(document_id):
-    if request.method == "DELETE":
-        try:
-            doc_ref = db.collection("recipes").document(document_id)
-            doc_ref.delete()
-            bucket = buckit.get_bucket("prepr-391015.appspot.com")
-            blobs = bucket.list_blobs(prefix=f"recipes/{document_id}")
-            bucket.delete_blobs(blobs)
-            return jsonify({"message": "Recipe deleted successfully"}), 200
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
-    # For GET request
-    try:
-        doc_ref = db.collection("recipes").document(document_id)
-        doc = doc_ref.get()
-        if doc.exists:
-            recipe_data = doc.to_dict()
-            return jsonify(recipe_data), 200
-        else:
-            return jsonify({"message": "Recipe not found"}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@recipe.route("/recipe/<recipe_id>", methods=["PUT"])
-@firebase_auth_required
-def update_recipe(recipe_id):
-    data = request.form
-    dict_data = {}
-    for key, value in data.lists():
-        if "ingredients" in key:
-            index = int(key.split("[")[1].split("]")[0])
-            sub_key = key.split("[")[2].split("]")[0]
-            if "ingredients" not in dict_data:
-                dict_data["ingredients"] = []
-            if len(dict_data["ingredients"]) - 1 < index:
-                dict_data["ingredients"].append({})
-            dict_data["ingredients"][index][sub_key] = value[0]
-        elif "photos" not in key:
-            dict_data[key] = value[0]
-
-    # process form data and validate it here
-
-    # retrieve the recipe document
-    doc_ref = db.collection("recipes").document(recipe_id)
-
-    # update the recipe document
-    doc_ref.update(dict_data)
-
-    return jsonify({"message": "Recipe updated successfully"}), 200
 
 
 @recipe.route("/recipe/<recipe_id>/photos", methods=["POST"])
@@ -262,5 +207,73 @@ def handle_like_recipe(document_id):
         return jsonify({"error": str(e)}), 500
 
 
-# except Exception as e:
-# return jsonify({"error": str(e)}), 500
+@recipe.route("/recipe/search", methods=["POST"])
+@firebase_auth_required
+def search_recipe():
+    search_term = request.json["search_term"]
+    recipes_ref = db.collection("recipes")
+
+    # Assuming there's a 'title' field in the recipes documents
+    query_ref = recipes_ref.where("title", ">=", search_term).where(
+        "title", "<=", search_term + "\uf8ff"
+    )
+
+    results = []
+    docs = query_ref.stream()
+    for doc in docs:
+        recipe = doc.to_dict()
+        recipe["id"] = doc.id
+        results.append(recipe)
+
+    return jsonify(results), 200
+
+
+@recipe.route("/recipe/<string:document_id>", methods=["PUT", "GET", "DELETE"])
+@firebase_auth_required
+def update_recipe(document_id):
+    if request.method == "DELETE":
+        try:
+            doc_ref = db.collection("recipes").document(document_id)
+            doc_ref.delete()
+            bucket = buckit.get_bucket("prepr-391015.appspot.com")
+            blobs = bucket.list_blobs(prefix=f"recipes/{document_id}")
+            bucket.delete_blobs(blobs)
+            return jsonify({"message": "Recipe deleted successfully"}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # For GET request
+    if request.method == "GET":
+        try:
+            doc_ref = db.collection("recipes").document(document_id)
+            doc = doc_ref.get()
+            if doc.exists:
+                recipe_data = doc.to_dict()
+                return jsonify(recipe_data), 200
+            else:
+                return jsonify({"message": "Recipe not found"}), 404
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    data = request.form
+    dict_data = {}
+    for key, value in data.lists():
+        if "ingredients" in key:
+            index = int(key.split("[")[1].split("]")[0])
+            sub_key = key.split("[")[2].split("]")[0]
+            if "ingredients" not in dict_data:
+                dict_data["ingredients"] = []
+            if len(dict_data["ingredients"]) - 1 < index:
+                dict_data["ingredients"].append({})
+            dict_data["ingredients"][index][sub_key] = value[0]
+        elif "photos" not in key:
+            dict_data[key] = value[0]
+
+    # process form data and validate it here
+
+    # retrieve the recipe document
+    doc_ref = db.collection("recipes").document(document_id)
+
+    # update the recipe document
+    doc_ref.update(dict_data)
+
+    return jsonify({"message": "Recipe updated successfully"}), 200

@@ -7,6 +7,7 @@ def firebase_auth_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         id_token = request.headers.get("Authorization")
+
         if not id_token:
             return jsonify({"message": "Token is missing"}), 403
 
