@@ -100,6 +100,7 @@ def generate_recipe():
     )
 
     recipe = response.choices[0].text.strip()
+    store_gpt_recipe(recipe)
     print (prompt)
     print(recipe)
     return recipe
