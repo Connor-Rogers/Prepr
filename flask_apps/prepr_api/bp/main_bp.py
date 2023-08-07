@@ -54,7 +54,7 @@ def get_random_recipe_from_likes(user_id):
 # upgrade css
 
 
-def generate_recipe(pantry_items: list = None, user_id=str):
+def generate_recipe(user_id, pantry_items: list = None):
     openai.api_key = "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"
     # if pantryItems != null:
     items_for_day = []
@@ -121,12 +121,17 @@ def gen_meal_plan(days):
     meal_plan = {}
     for day in range(days):
         recipe = {}
-        while True:
+        retries = 0
+        cond = True
+        while cond:
             try:
                 recipe = generate_recipe(pantry_items, g.user.get("user_id"))
                 recipe = json.loads(recipe, strict=False)
-                break
+                cond = False
             except json.decoder.JSONDecodeError:
+                retries = retries + 1
+                if retries > 3:
+                    cond = False
                 print("Failed To Generate Good Recipes")
 
         meal_plan[day] = recipe
@@ -157,7 +162,7 @@ def add_generated_recipe():
 
     doc_ref.set(
         {
-            "author": "U4KM71XEAOeIuWCb7S0s",  # setting user_id as a constant
+            "author": g.user.get("user_id"),  # setting user_id as a constant
             "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "title": title,
             "instructions": instructions,
