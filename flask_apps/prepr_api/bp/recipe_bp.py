@@ -83,7 +83,10 @@ def create_recipe():
         }
     )
 
-    return jsonify({"message": "Recipe created successfully"}), 200
+    return (
+        jsonify({"message": "Recipe created successfully", "recipe_id": recipe_id}),
+        200,
+    )
 
 
 @recipe.route("/recipe/<string:document_id>/photos", methods=["GET"])

@@ -41,58 +41,57 @@ def handle_day_meal_plan(user_id, day_number):
 @meal_plan.route("/meal_plan/<string:user_id>", methods=["GET"])
 @firebase_auth_required
 def get_meal_plan(user_id):
-    try:
-        # Getting the user's meal plan from the Firestore
-        meal_plan_ref = db.collection("meal_plan").document(user_id)
-        meal_plan_doc = meal_plan_ref.get()
+    # try:
+    # Getting the user's meal plan from the Firestore
+    meal_plan_ref = db.collection("meal_plan").document(user_id)
+    meal_plan_doc = meal_plan_ref.get()
 
-        # If the meal plan doesn't exist, initialize it as an empty object
-        if not meal_plan_doc.exists:
-            return jsonify({}), 200
+    # If the meal plan doesn't exist, initialize it as an empty object
+    if not meal_plan_doc.exists:
+        return jsonify({}), 200
 
-        meal_plan = meal_plan_doc.to_dict()
+    meal_plan = meal_plan_doc.to_dict()
 
-        # If the meal plan exists but is empty, return an empty object
-        if not meal_plan:
-            return jsonify({}), 200
+    # If the meal plan exists but is empty, return an empty object
+    if not meal_plan:
+        return jsonify({}), 200
 
-        # Define a placeholder recipe
-        placeholder_recipe = {
-            "title": "No recipe selected",
-            "calories": 0,
-            "carbs": 0,
-            "fats": 0,
-            "proteins": 0,
-            "photos": [],
-        }
+    # Define a placeholder recipe
+    placeholder_recipe = {
+        "title": "No recipe selected",
+        "calories": 0,
+        "carbs": 0,
+        "fats": 0,
+        "proteins": 0,
+        "photos": [],
+    }
 
-        # Fetch the recipes for the meal plan
-        recipes_ref = db.collection("recipes")
-        meal_plan_with_recipes = {}
-        for day, recipe_ids in meal_plan.items():
-            meal_plan_with_recipes[day] = [
-                recipes_ref.document(id).get().to_dict() if id else placeholder_recipe
-                for id in recipe_ids
-            ]
+    # Fetch the recipes for the meal plan
+    recipes_ref = db.collection("recipes")
+    meal_plan_with_recipes = {}
+    for day, recipe_ids in meal_plan.items():
+        meal_plan_with_recipes[day] = [
+            recipes_ref.document(id).get().to_dict() if id else placeholder_recipe
+            for id in recipe_ids
+        ]
 
-            # Limit the fields returned for each recipe
-            for i in range(len(meal_plan_with_recipes[day])):
-                if (
-                    meal_plan_with_recipes[day][i] is not placeholder_recipe
-                ):  # Don't overwrite placeholder
-                    meal_plan_with_recipes[day][i] = {
-                        "id": recipe_ids[i],
-                        "title": meal_plan_with_recipes[day][i]["title"],
-                        "calories": meal_plan_with_recipes[day][i]["calories"],
-                        "carbs": meal_plan_with_recipes[day][i]["carbs"],
-                        "fats": meal_plan_with_recipes[day][i]["fats"],
-                        "proteins": meal_plan_with_recipes[day][i]["proteins"],
-                        "photos": meal_plan_with_recipes[day][i]["photos"],
-                    }
-        print(meal_plan_with_recipes)
-        return jsonify(meal_plan_with_recipes), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        # Limit the fields returned for each recipe
+        for i in range(len(meal_plan_with_recipes[day])):
+            if (
+                meal_plan_with_recipes[day][i] is not placeholder_recipe
+            ):  # Don't overwrite placeholder
+                meal_plan_with_recipes[day][i] = {
+                    "id": recipe_ids[i],
+                    "title": meal_plan_with_recipes[day][i]["title"],
+                    "calories": meal_plan_with_recipes[day][i]["calories"],
+                    "carbs": meal_plan_with_recipes[day][i]["carbs"],
+                    "fats": meal_plan_with_recipes[day][i]["fats"],
+                    "proteins": meal_plan_with_recipes[day][i]["proteins"],
+                }
+    print(meal_plan_with_recipes)
+    return jsonify(meal_plan_with_recipes), 200
+    # except Exception as e:
+    return jsonify({"error": str(e)}), 500
 
 
 @meal_plan.route(
