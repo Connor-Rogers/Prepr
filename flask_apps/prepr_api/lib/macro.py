@@ -7,6 +7,21 @@ def macro_calculator(
     gender: str,
     goal: str,
 ):
+    """
+    Calculate macronutrient needs based on user details and goals.
+
+    Parameters:
+    - height_ft (str): User's height in feet.
+    - height_in (str): User's height in inches. This is an additional measurement to the height in feet.
+    - weight (int): User's weight in pounds.
+    - age (int): User's age in years.
+    - activity (str): User's level of physical activity. Acceptable values are: 'sedentary', 'light', 'moderate', 'active', 'very active'.
+    - gender (str): User's gender. Acceptable values are: 'male', 'female', and any other value will be considered as 'other'.
+    - goal (str): User's fitness goal. Acceptable values are: 'lose' (to lose weight) and 'gain' (to gain weight).
+
+    Returns:
+    - dict: A dictionary containing the daily macronutrient needs in grams for carbohydrates, protein, and fat.
+    """
     body_mass_ratio = 0
     total_daily_energy = 0
     weight_in_kg = weight / 2.20462

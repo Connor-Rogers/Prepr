@@ -1,12 +1,12 @@
-from flask import Blueprint, make_response, request, jsonify, g
-from lib.iam import firebase_auth_required
-from lib.firebase import buckit, db
-from PIL import Image
+from flask import Blueprint, request, jsonify, g
 from datetime import timedelta
+from decouple import config
 import io, re
 import datetime
 import uuid
 
+from lib.iam import firebase_auth_required
+from lib.firebase import buckit, db
 
 recipe = Blueprint("recipe_bp", __name__)
 
@@ -14,6 +14,20 @@ recipe = Blueprint("recipe_bp", __name__)
 @recipe.route("/recipe/create", methods=["POST"])
 @firebase_auth_required
 def create_recipe():
+    """
+    Create a new recipe.
+
+    Expects form data containing:
+    - title: The title of the recipe.
+    - instructions: The cooking instructions.
+    - calories, fats, carbs, proteins: Nutritional information.
+    - ingredients: Ingredients in the format ingredients[i][property_name].
+    - photos[]: An array of photos.
+
+    Returns:
+    - JSON response with message and recipe_id.
+    - HTTP status code.
+    """
     # get the form data and convert it to a dictionary
     form_data = dict(request.form)
 
@@ -38,9 +52,6 @@ def create_recipe():
         # add the property to the appropriate ingredient
         ingredients[index][prop] = form_data[k]
 
-    # print the list of ingredients
-    print(ingredients)
-
     title = form_data.get("title")
     instructions = form_data.get("instructions")
     calories = form_data.get("calories")
@@ -54,7 +65,7 @@ def create_recipe():
     # creating a unique id for the recipe
     recipe_id = str(uuid.uuid4())
 
-    bucket = buckit.get_bucket("prepr-391015.appspot.com")
+    bucket = buckit.get_bucket(config("GCLOUD_BUKIT"))
     photo_urls = []
 
     for i, photo in enumerate(photos):
@@ -92,6 +103,13 @@ def create_recipe():
 @recipe.route("/recipe/<string:document_id>/photos", methods=["GET"])
 @firebase_auth_required
 def get_recipe_photos(document_id):
+    """
+    Fetch photos associated with a given recipe document ID.
+
+    Returns:
+    - JSON response containing the photos URL or an error message.
+    - HTTP status code.
+    """
     doc_ref = db.collection("recipes").document(document_id)
     try:
         doc = doc_ref.get()
@@ -99,7 +117,7 @@ def get_recipe_photos(document_id):
             profile_data = doc.to_dict()
 
             # Fetch the image url from Firebase storage
-            bucket = buckit.get_bucket("prepr-391015.appspot.com")
+            bucket = buckit.get_bucket(config("GCLOUD_BUKIT"))
 
             # Get a list of all blobs in the 'recipes/{document_id}' directory
             blobs = bucket.list_blobs(prefix=f"recipes/{document_id}")
@@ -124,8 +142,18 @@ def get_recipe_photos(document_id):
 @recipe.route("/recipe/<recipe_id>/photos", methods=["POST"])
 @firebase_auth_required
 def add_photos(recipe_id):
+    """
+    Add photos to an existing recipe.
+
+    Expects form data containing:
+    - photos: An array of photos to add to the recipe.
+
+    Returns:
+    - JSON response with a success message and list of photo URLs.
+    - HTTP status code.
+    """
     photos = request.files.getlist("photos")
-    bucket = buckit.get_bucket("prepr-391015.appspot.com")
+    bucket = buckit.get_bucket(config("GCLOUD_BUKIT"))
     photo_urls = []
     for i, photo in enumerate(photos):
         photo_bytes = io.BytesIO()
@@ -144,8 +172,18 @@ def add_photos(recipe_id):
 @recipe.route("/recipe/<recipe_id>/photos", methods=["DELETE"])
 @firebase_auth_required
 def delete_photos(recipe_id):
+    """
+    Delete specific photos from a recipe.
+
+    Expects form data containing:
+    - photos: A list of photo URLs to be removed.
+
+    Returns:
+    - JSON response with a success message.
+    - HTTP status code.
+    """
     photos_to_remove = request.form.getlist("photos")
-    bucket = buckit.get_bucket("prepr-391015.appspot.com")
+    bucket = buckit.get_bucket(config("GCLOUD_BUKIT"))
 
     for photo_url in photos_to_remove:
         photo_name = re.findall(r"([^/]+)/?$", photo_url)[0]
@@ -169,6 +207,19 @@ def delete_photos(recipe_id):
 @recipe.route("/recipe/<string:document_id>/like", methods=["GET", "POST"])
 @firebase_auth_required
 def handle_like_recipe(document_id):
+    """
+    Handle like functionality for a given recipe.
+
+    For GET:
+    - Fetch like status for a recipe.
+
+    For POST:
+    - Expects a JSON payload with 'like' status (True/False) to update the like status.
+
+    Returns:
+    - JSON response with like status or a success message.
+    - HTTP status code.
+    """
     try:
         if request.method == "GET":
             doc_ref = db.collection("likes").document(document_id)
@@ -213,10 +264,19 @@ def handle_like_recipe(document_id):
 @recipe.route("/recipe/search", methods=["POST"])
 @firebase_auth_required
 def search_recipe():
+    """
+    Search for recipes based on a given search term.
+
+    Expects JSON payload containing:
+    - search_term: The term to search for in recipe titles.
+
+    Returns:
+    - JSON response containing a list of matching recipes.
+    - HTTP status code.
+    """
     search_term = request.json["search_term"]
     recipes_ref = db.collection("recipes")
 
-    # Assuming there's a 'title' field in the recipes documents
     query_ref = recipes_ref.where("title", ">=", search_term).where(
         "title", "<=", search_term + "\uf8ff"
     )
@@ -234,11 +294,27 @@ def search_recipe():
 @recipe.route("/recipe/<string:document_id>", methods=["PUT", "GET", "DELETE"])
 @firebase_auth_required
 def update_recipe(document_id):
+    """
+    Handle different operations on a single recipe.
+
+    For DELETE:
+    - Deletes the recipe with the given document_id.
+
+    For GET:
+    - Fetches the recipe with the given document_id.
+
+    For PUT:
+    - Updates the recipe with the given document_id.
+
+    Returns:
+    - JSON response with the operation result.
+    - HTTP status code.
+    """
     if request.method == "DELETE":
         try:
             doc_ref = db.collection("recipes").document(document_id)
             doc_ref.delete()
-            bucket = buckit.get_bucket("prepr-391015.appspot.com")
+            bucket = buckit.get_bucket(config("GCLOUD_BUKIT"))
             blobs = bucket.list_blobs(prefix=f"recipes/{document_id}")
             bucket.delete_blobs(blobs)
             return jsonify({"message": "Recipe deleted successfully"}), 200

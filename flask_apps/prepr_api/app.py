@@ -1,14 +1,28 @@
-# Main WSGI Application
+"""
+WSGI Application Module
+
+This module sets up and initializes the main Flask application for the server. 
+Configuration values for Flask are specified, and CORS is set up to allow cross-origin requests.
+The module also imports and registers multiple blueprints that likely handle different parts of the application.
+
+Dependencies:
+    - flask: A lightweight WSGI web application framework.
+    - flask_cors: An extension for Flask that adds support for handling Cross-Origin Resource Sharing (CORS).
+
+Functions:
+    - app_factory(): Factory function for creating and configuring the Flask app instance.
+"""
 import flask
-from flask import Blueprint
 from flask_cors import CORS
 
 
 def app_factory():
     """
-    Create Flask app
-    """
+    Factory function to create and configure a Flask app instance.
 
+    Returns:
+        flask.Flask: Configured Flask app instance.
+    """
     app = flask.Flask(__name__)
     app.config = {
         "ENV": "development",
@@ -47,12 +61,6 @@ def app_factory():
     app.register_blueprint(main)
     app.register_blueprint(profile)
     app.register_blueprint(recipe)
-
-    # try:
-    #     cred = credentials.Certificate("prepr_fb_secret.json")
-    #     firebase_admin.initialize_app(cred)
-    # except ValueError:
-    #     pass
 
     return app
 

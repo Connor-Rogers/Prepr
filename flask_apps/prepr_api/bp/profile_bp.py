@@ -1,12 +1,13 @@
 from datetime import timedelta
 from flask import Blueprint, request, jsonify, g
-from lib.iam import firebase_auth_required
-from lib.macro import macro_calculator
 from werkzeug.datastructures import FileStorage
-from lib.firebase import buckit, db
 from PIL import Image
 import io, re
+from decouple import config
 
+from lib.firebase import buckit, db
+from lib.iam import firebase_auth_required
+from lib.macro import macro_calculator
 
 profile = Blueprint("profile_bp", __name__)
 
@@ -14,6 +15,14 @@ profile = Blueprint("profile_bp", __name__)
 @profile.route("/profile/get", methods=["GET"])
 @firebase_auth_required
 def get_profile():
+    """
+    Retrieve the profile data for the authenticated user.
+
+    Returns:
+        dict: Profile data if found.
+        dict: Error message if the profile is not found.
+    """
+    # ... code ...
     # get user data
     user_id = g.user.get("user_id")  # getting user_id
     doc_ref = db.collection("profile").document(user_id)
@@ -28,6 +37,16 @@ def get_profile():
 @profile.route("/profile/goals", methods=["POST"])
 @firebase_auth_required
 def update_goals():
+    """
+    Update the fitness goals of the authenticated user based on the given parameters.
+
+    Expected JSON:
+        heightin, heightft, weight, age, activity, gender, goal
+
+    Returns:
+        dict: Success message if the goals are updated successfully.
+        dict: Error message if the input data is invalid.
+    """
     user_id = g.user.get("user_id")  # getting user_id
 
     # Extract data from the request
@@ -73,6 +92,18 @@ def update_goals():
 @profile.route("/profile/insert", methods=["POST"])
 @firebase_auth_required
 def create_or_update_profile():
+    """
+    Create or update the profile for the authenticated user. This also handles
+    the uploading of an image for the user's profile picture.
+
+    Form Data:
+        name: Name of the user.
+        image: Image file to be used as the user's profile picture.
+
+    Returns:
+        dict: Success message if the profile data and image are successfully received and stored.
+        dict: Error message if there's an issue with the provided data.
+    """
     name = request.form.get("name")  # getting name from form data
     image = request.files.get("image", None)  # getting image from form data
 
@@ -98,7 +129,7 @@ def create_or_update_profile():
             image_bytes.seek(0)
 
         # Delete old photo if exists
-        bucket = buckit.get_bucket("prepr-391015.appspot.com")
+        bucket = buckit.get_bucket(config("GCLOUD_BUKIT"))
         old_blob_name = f"profile/{user_id}/photo.{file_ext}"
         old_blob = bucket.blob(old_blob_name)
         if old_blob.exists():
@@ -141,6 +172,13 @@ def create_or_update_profile():
 @profile.route("/profile/get/photo", methods=["GET"])
 @firebase_auth_required
 def get_icon():
+    """
+    Retrieve the profile picture URL for the authenticated user.
+
+    Returns:
+        dict: Profile data including the image URL if found.
+        dict: Error message if the profile or image is not found.
+    """
     user_id = g.user.get("user_id")
     doc_ref = db.collection("profile").document(user_id)
 
@@ -150,7 +188,7 @@ def get_icon():
             profile_data = doc.to_dict()
 
             # Fetch the image url from Firebase storage
-            bucket = buckit.get_bucket("prepr-391015.appspot.com")
+            bucket = buckit.get_bucket(config("GCLOUD_BUKIT"))
 
             # Get a list of all blobs in the 'profile/{user_id}' directory
             blobs = bucket.list_blobs(prefix=f"profile/{user_id}")
@@ -173,6 +211,13 @@ def get_icon():
 @profile.route("/profile/get/username", methods=["GET"])
 @firebase_auth_required
 def get_username():
+    """
+    Retrieve the username for the authenticated user.
+
+    Returns:
+        dict: Username of the authenticated user if found.
+        dict: Error message if the profile is not found.
+    """
     user_id = g.user.get("user_id")
     doc_ref = db.collection("profile").document(user_id)
 
@@ -191,6 +236,16 @@ def get_username():
 @profile.route("/profile/get/photo/<other_user_id>", methods=["GET"])
 @firebase_auth_required
 def get_other_icon(other_user_id):
+    """
+    Retrieve the profile picture URL for a specific user that is not the active user.
+
+    Parameters:
+        other_user_id (str): User ID of the user whose profile picture URL is to be fetched.
+
+    Returns:
+        dict: Profile data including the image URL if found.
+        dict: Error message if the profile or image is not found.
+    """
     doc_ref = db.collection("profile").document(other_user_id)
 
     try:
@@ -199,7 +254,7 @@ def get_other_icon(other_user_id):
             profile_data = doc.to_dict()
 
             # Fetch the image url from Firebase storage
-            bucket = buckit.get_bucket("prepr-391015.appspot.com")
+            bucket = buckit.get_bucket(config("GCLOUD_BUKIT"))
 
             # Get a list of all blobs in the 'profile/{other_user_id}' directory
             blobs = bucket.list_blobs(prefix=f"profile/{other_user_id}")

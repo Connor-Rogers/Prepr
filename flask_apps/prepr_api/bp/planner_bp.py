@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify
 from lib.iam import firebase_auth_required
 from lib.firebase import db
 
@@ -8,6 +8,13 @@ meal_plan = Blueprint("planner_bp", __name__)
 @meal_plan.route("/meal_plan/<string:user_id>/day/<int:day_number>", methods=["PUT"])
 @firebase_auth_required
 def handle_day_meal_plan(user_id, day_number):
+    """
+    Update the number of meals planned for a specific day for a user.
+
+    :param user_id: The unique ID of the user.
+    :param day_number: Day for which the meal plan needs to be updated.
+    :return: A JSON response indicating the outcome.
+    """
     try:
         # Assume the structure of meal_plan is {day: [meals]}
         meal_plan_ref = db.collection("meal_plan").document(user_id)
@@ -41,57 +48,62 @@ def handle_day_meal_plan(user_id, day_number):
 @meal_plan.route("/meal_plan/<string:user_id>", methods=["GET"])
 @firebase_auth_required
 def get_meal_plan(user_id):
-    # try:
-    # Getting the user's meal plan from the Firestore
-    meal_plan_ref = db.collection("meal_plan").document(user_id)
-    meal_plan_doc = meal_plan_ref.get()
+    """
+    Retrieve the full meal plan for a user, with recipe details.
 
-    # If the meal plan doesn't exist, initialize it as an empty object
-    if not meal_plan_doc.exists:
-        return jsonify({}), 200
+    :param user_id: The unique ID of the user.
+    :return: A JSON response containing the meal plan with recipes or error details.
+    """
+    try:
+        # Getting the user's meal plan from the Firestore
+        meal_plan_ref = db.collection("meal_plan").document(user_id)
+        meal_plan_doc = meal_plan_ref.get()
 
-    meal_plan = meal_plan_doc.to_dict()
+        # If the meal plan doesn't exist, initialize it as an empty object
+        if not meal_plan_doc.exists:
+            return jsonify({}), 200
 
-    # If the meal plan exists but is empty, return an empty object
-    if not meal_plan:
-        return jsonify({}), 200
+        meal_plan = meal_plan_doc.to_dict()
 
-    # Define a placeholder recipe
-    placeholder_recipe = {
-        "title": "No recipe selected",
-        "calories": 0,
-        "carbs": 0,
-        "fats": 0,
-        "proteins": 0,
-        "photos": [],
-    }
+        # If the meal plan exists but is empty, return an empty object
+        if not meal_plan:
+            return jsonify({}), 200
 
-    # Fetch the recipes for the meal plan
-    recipes_ref = db.collection("recipes")
-    meal_plan_with_recipes = {}
-    for day, recipe_ids in meal_plan.items():
-        meal_plan_with_recipes[day] = [
-            recipes_ref.document(id).get().to_dict() if id else placeholder_recipe
-            for id in recipe_ids
-        ]
+        # Define a placeholder recipe
+        placeholder_recipe = {
+            "title": "No recipe selected",
+            "calories": 0,
+            "carbs": 0,
+            "fats": 0,
+            "proteins": 0,
+            "photos": [],
+        }
 
-        # Limit the fields returned for each recipe
-        for i in range(len(meal_plan_with_recipes[day])):
-            if (
-                meal_plan_with_recipes[day][i] is not placeholder_recipe
-            ):  # Don't overwrite placeholder
-                meal_plan_with_recipes[day][i] = {
-                    "id": recipe_ids[i],
-                    "title": meal_plan_with_recipes[day][i]["title"],
-                    "calories": meal_plan_with_recipes[day][i]["calories"],
-                    "carbs": meal_plan_with_recipes[day][i]["carbs"],
-                    "fats": meal_plan_with_recipes[day][i]["fats"],
-                    "proteins": meal_plan_with_recipes[day][i]["proteins"],
-                }
-    print(meal_plan_with_recipes)
-    return jsonify(meal_plan_with_recipes), 200
-    # except Exception as e:
-    return jsonify({"error": str(e)}), 500
+        # Fetch the recipes for the meal plan
+        recipes_ref = db.collection("recipes")
+        meal_plan_with_recipes = {}
+        for day, recipe_ids in meal_plan.items():
+            meal_plan_with_recipes[day] = [
+                recipes_ref.document(id).get().to_dict() if id else placeholder_recipe
+                for id in recipe_ids
+            ]
+
+            # Limit the fields returned for each recipe
+            for i in range(len(meal_plan_with_recipes[day])):
+                if (
+                    meal_plan_with_recipes[day][i] is not placeholder_recipe
+                ):  # Don't overwrite placeholder
+                    meal_plan_with_recipes[day][i] = {
+                        "id": recipe_ids[i],
+                        "title": meal_plan_with_recipes[day][i]["title"],
+                        "calories": meal_plan_with_recipes[day][i]["calories"],
+                        "carbs": meal_plan_with_recipes[day][i]["carbs"],
+                        "fats": meal_plan_with_recipes[day][i]["fats"],
+                        "proteins": meal_plan_with_recipes[day][i]["proteins"],
+                    }
+        return jsonify(meal_plan_with_recipes), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @meal_plan.route(
@@ -99,6 +111,14 @@ def get_meal_plan(user_id):
 )
 @firebase_auth_required
 def add_to_meal_plan(user_id, recipe_id):
+    """
+    Add a specific recipe to the user's meal plan. If there's an available slot in the plan, the recipe is added.
+    Otherwise, the last recipe of the most filled day is replaced.
+
+    :param user_id: The unique ID of the user.
+    :param recipe_id: The unique ID of the recipe to be added.
+    :return: A JSON response indicating the outcome.
+    """
     try:
         # Getting the user's meal plan from the Firestore
         meal_plan_ref = db.collection("meal_plan").document(user_id)
@@ -135,7 +155,6 @@ def add_to_meal_plan(user_id, recipe_id):
                 meal_plan[day].append(recipe_id)
 
         meal_plan_ref.set(meal_plan)
-        print(meal_plan)
 
         return jsonify({"message": "Recipe added to meal plan successfully"}), 200
     except Exception as e:
@@ -148,6 +167,14 @@ def add_to_meal_plan(user_id, recipe_id):
 )
 @firebase_auth_required
 def remove_meal_from_day(user_id, index, meal_index):
+    """
+    Remove a meal from a specific day in the user's meal plan.
+
+    :param user_id: The unique ID of the user.
+    :param index: Index of the day from which the meal needs to be removed.
+    :param meal_index: Index of the meal to be removed on the specified day.
+    :return: A JSON response indicating the outcome.
+    """
     try:
         # Get the user's meal plan from the Firestore
         meal_plan_ref = db.collection("meal_plan").document(user_id)
