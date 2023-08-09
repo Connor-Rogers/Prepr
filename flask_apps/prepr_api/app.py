@@ -26,8 +26,8 @@ def app_factory():
     app = flask.Flask(__name__)
     app.config = {
         "ENV": "development",
-        "SECRET_KEY": "secret",
-        "DEBUG": True,
+        "SECRET_KEY": "daf184ba-b926-43d1-97c8-0c734564b307",
+        "DEBUG": False,
         "SERVER_NAME": "127.0.0.1:5000",
         "PROPAGATE_EXCEPTIONS": True,
         "APPLICATION_ROOT": "/v1",
